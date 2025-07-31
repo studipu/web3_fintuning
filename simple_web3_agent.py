@@ -11,8 +11,67 @@ from datasets import Dataset
 import json
 import os
 
-def create_sample_data():
-    """샘플 데이터 생성"""
+def load_training_data(file_path="training_set.jsonl"):
+    """training_set.jsonl 파일에서 데이터 로드"""
+    if not os.path.exists(file_path):
+        print(f"❌ Training file not found: {file_path}")
+        print("Creating sample data instead...")
+        return create_fallback_data()
+    
+    data = []
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            for line_num, line in enumerate(f, 1):
+                try:
+                    json_data = json.loads(line.strip())
+                    
+                    # 대화를 텍스트 형식으로 변환
+                    text = convert_conversation_to_text(json_data)
+                    if text:
+                        data.append({"text": text})
+                        
+                except json.JSONDecodeError as e:
+                    print(f"⚠️ JSON parsing error on line {line_num}: {e}")
+                except Exception as e:
+                    print(f"⚠️ Error processing line {line_num}: {e}")
+        
+        print(f"✅ Loaded {len(data)} conversations from {file_path}")
+        return data
+        
+    except Exception as e:
+        print(f"❌ Error reading file {file_path}: {e}")
+        return create_fallback_data()
+
+def convert_conversation_to_text(json_data):
+    """JSON 대화 데이터를 텍스트 형식으로 변환"""
+    try:
+        conversations = json_data.get("conversations", [])
+        if not conversations:
+            return None
+        
+        text_parts = []
+        
+        for conv in conversations:
+            role = conv.get("role", "")
+            content = conv.get("content", "")
+            
+            if role == "user":
+                text_parts.append(f"User: {content}")
+            elif role == "function_call":
+                text_parts.append(f"Assistant: <function_call>{content}</function_call>")
+            elif role == "observation":
+                text_parts.append(f"System: <observation>{content}</observation>")
+            elif role == "assistant":
+                text_parts.append(f"Assistant: {content}")
+        
+        return "\n".join(text_parts)
+        
+    except Exception as e:
+        print(f"⚠️ Error converting conversation: {e}")
+        return None
+
+def create_fallback_data():
+    """파일이 없을 때 사용할 폴백 데이터"""
     return [
         {
             "text": "User: What's the price of ETH?\nAssistant: <function_call>{\"name\": \"get_current_prices\", \"arguments\": {\"tokens\": [\"ETH\"]}}</function_call>\nSystem: <observation>{\"ETH\": \"$2000\"}</observation>\nAssistant: The current price of Ethereum (ETH) is $2,000."
@@ -101,8 +160,13 @@ def main():
             param.requires_grad = True
     
     # 데이터 준비
-    print("📝 Preparing dataset...")
-    raw_data = create_sample_data()
+    print("📝 Loading training dataset...")
+    raw_data = load_training_data("training_set.jsonl")
+    
+    if not raw_data:
+        print("❌ No valid training data found!")
+        return
+    
     dataset = Dataset.from_list(raw_data)
     
     # 토큰화
