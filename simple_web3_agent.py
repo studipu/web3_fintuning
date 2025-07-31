@@ -181,7 +181,7 @@ def main():
     # 훈련 설정
     training_args = TrainingArguments(
         output_dir="./web3-agent-simple",
-        num_train_epochs=2,
+        num_train_epochs=5,
         per_device_train_batch_size=1,
         gradient_accumulation_steps=8,
         learning_rate=5e-5,
@@ -257,6 +257,10 @@ def main():
         
         test_input = "User: What's the price of Bitcoin?"
         inputs = tokenizer(test_input, return_tensors="pt")
+        
+        # 입력을 모델과 같은 디바이스로 이동
+        if torch.cuda.is_available():
+            inputs = {k: v.to(model.device) for k, v in inputs.items()}
         
         with torch.no_grad():
             outputs = model.generate(
